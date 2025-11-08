@@ -2,7 +2,6 @@ import streamlit as st
 import google.generativeai as genai
 import PyPDF2
 from collections import Counter
-import re
 
 # Configure Gemini
 from config import GEMINI_API_KEY
@@ -19,7 +18,11 @@ def extract_text_from_pdf(file):
 
 # Frequency analysis
 def word_frequency_analysis(text, top_n=10):
-    words = re.findall(r'\b[a-zA-Z]+\b', text.lower())
+    # Simple approach: split on spaces, remove punctuation manually
+    text = text.lower()
+    for ch in ".,!?;:()\"'-":
+        text = text.replace(ch, "")
+    words = text.split()
     counter = Counter(words)
     return counter.most_common(top_n)
 
@@ -29,16 +32,16 @@ def analyze_essay(essay_text):
     freq_table = "\n".join([f"{w}: {c}" for w, c in top_words])
 
     prompt = f"""
-    You are a writing analysis assistant. Analyze the following essay:
+    Analyze the following essay:
 
-    1. Concise summary (2–3 sentences)
+    1. Concise summary (4-5 sentences)
     2. Sentence-final expressions — analyze how sentences end and what patterns exist
     3. Frequently used words — confirm the ones below
        Word Frequency (top 10):
        {freq_table}
     4. Writing quality — comment on organization, vocabulary, coherence, grammar
     5. Areas for improvement — constructive suggestions
-    6. Overall evaluation — score 1–10
+    6. Overall evaluation — score 0-100
 
     Essay:
     {essay_text}
@@ -49,7 +52,6 @@ def analyze_essay(essay_text):
 # Follow-up Q&A
 def answer_question(essay_text, user_question):
     prompt = f"""
-    You are an assistant who only uses the information in the essay below.
     Essay:
     {essay_text}
 
@@ -61,29 +63,35 @@ def answer_question(essay_text, user_question):
     return response.text
 
 # Streamlit UI
-st.title("Essay Analysis Chatbot")
-uploaded_file = st.file_uploader("Upload your essay (PDF)", type="pdf")
+st.subheader("Choose essay input method:")
+input_method = st.radio("Select one:", ["Upload PDF", "Copy & Paste Text"])
 
-if uploaded_file:
-    essay_text = extract_text_from_pdf(uploaded_file)
-    st.subheader("Essay Text (Preview)")
-    st.text(essay_text[:500] + "...\n")
+essay_text = ""
 
-    # Initial analysis
-    if st.button("Analyze Essay"):
-        with st.spinner("Analyzing essay..."):
-            analysis_results = analyze_essay(essay_text)
-            st.subheader("Analysis Results")
-            st.text(analysis_results)
+# Input section
+if input_method == "Upload PDF":
+    uploaded_file = st.file_uploader("Upload your essay (PDF)", type="pdf")
+    if uploaded_file:
+        from PyPDF2 import PdfReader
+        reader = PdfReader(uploaded_file)
+        essay_text = ""
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                essay_text += page_text + "\n"
+elif input_method == "Copy & Paste Text":
+    essay_text = st.text_area("Paste your essay here", height=300)
 
-        # Store essay text for follow-up questions
+# Preview essay text
+if essay_text:
+    st.subheader("Essay Text Preview")
+    st.text(essay_text[:500] + ("..." if len(essay_text) > 500 else ""))
+
+# Show the button **after** the essay text area or PDF upload
+if essay_text and st.button("Analyze Essay"):
+    with st.spinner("Analyzing essay..."):
+        analysis_results = analyze_essay(essay_text)  # Your existing function
+        st.subheader("Analysis Results")
+        st.text(analysis_results)
+        # Save to session for Q&A
         st.session_state['essay_text'] = essay_text
-
-# Follow-up Q&A
-if 'essay_text' in st.session_state:
-    st.subheader("Ask Questions About the Essay")
-    user_question = st.text_input("Enter your question:")
-    if user_question:
-        with st.spinner("Getting answer..."):
-            answer = answer_question(st.session_state['essay_text'], user_question)
-            st.text(answer)
