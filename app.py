@@ -3,6 +3,10 @@ import google.generativeai as genai
 import PyPDF2
 from collections import Counter
 
+# Session state for not clicking the exit button
+if 'exit_clicked' not in st.session_state:
+    st.session_state['exit_clicked'] = False
+
 # Reset UI
 if 'reset_ui' in st.session_state and st.session_state['reset_ui']:
     # Clear the flag
@@ -102,29 +106,27 @@ if essay_text:
     st.subheader("Essay Text Preview")
     st.text_area("Preview:", value=essay_text, height=300)
 
-# Show the button after the essay text area or PDF upload
-if essay_text and st.button("Analyze Essay"):
-    with st.spinner("Analyzing essay..."):
-        analysis_results = analyze_essay(essay_text)  # Your existing function
-        st.subheader("Analysis Results")
-        st.text(analysis_results)
-        # Save to session for Q&A
-        st.session_state['essay_text'] = essay_text
+# If the exit button not clicked
+if not st.session_state['exit_clicked']:
+    # Show essay analysis button
+    if essay_text and st.button("Analyze Essay"):
+        with st.spinner("Analyzing essay..."):
+            analysis_results = analyze_essay(essay_text)
+            st.subheader("Analysis Results")
+            st.text(analysis_results)
+            st.session_state['essay_text'] = essay_text
 
-# Follow-up Q&A
-if 'essay_text' in st.session_state:
-    st.subheader("Ask Questions About the Essay")
+    # Show follow-up Q&A
+    if 'essay_text' in st.session_state:
+        st.subheader("Ask Questions About the Essay")
+        user_question = st.text_input("Enter your question:")
+        if user_question and st.button("Get Answer"):
+            with st.spinner("Generating answer..."):
+                answer = answer_question(st.session_state['essay_text'], user_question)
+                st.text_area("Answer:", value=answer, height=150)
 
-    # Text input for the question
-    user_question = st.text_input("Enter your question:")
 
-    # Button to submit the question
-    if user_question and st.button("Get Answer"):
-        with st.spinner("Generating answer..."):
-            answer = answer_question(st.session_state['essay_text'], user_question)
-            st.text_area("Answer:", value=answer, height=150)
-
-# Option for the user to exit
+# If the exit button clicked
 if st.button("Exit"):
+    st.session_state['exit_clicked'] = True
     st.warning("Program ended by user.")
-    st.stop()
