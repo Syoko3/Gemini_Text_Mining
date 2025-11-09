@@ -124,19 +124,6 @@ if 'essay_text' in st.session_state:
             answer = answer_question(st.session_state['essay_text'], user_question)
             st.text_area("Answer:", value=answer, height=150)
 
-# Delete Essay
-if 'essay_text' in st.session_state:
-    if st.button("Delete Essay"):
-        del st.session_state['essay_text']
-        st.success("Essay deleted. You can now upload a new one or paste text.")
-        
-        # Optionally clear the question input
-        if 'user_question' in st.session_state:
-            del st.session_state['user_question']
-        
-        # Instead of st.experimental_rerun(), we can do this:
-        st.session_state['reset_ui'] = True  # flag to trigger UI reset
-
 # Option for the user to exit
 if st.button("Exit"):
     st.warning("Program ended by user.")
