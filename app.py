@@ -3,9 +3,24 @@ import google.generativeai as genai
 import PyPDF2
 from collections import Counter
 
-# Configure Gemini
-from config import GEMINI_API_KEY
-genai.configure(api_key=GEMINI_API_KEY)
+# Reset UI
+if 'reset_ui' in st.session_state and st.session_state['reset_ui']:
+    # Clear the flag
+    st.session_state['reset_ui'] = False
+    # Force a rerun
+    st.experimental_set_query_params()  # triggers a soft rerun in the new API
+
+# Let the user paste the key
+api_key = st.text_input("Enter your Google Gemini API Key:", type="password")
+
+if not api_key:
+    st.error("API key is required!")
+    st.stop()
+
+# Configure the Gemini client
+genai.configure(api_key=api_key)
+
+st.success("API key configured! You can now call the API.")
 model = genai.GenerativeModel("gemini-2.5-pro")
 
 # PDF extraction
@@ -85,9 +100,9 @@ elif input_method == "Copy & Paste Text":
 # Preview essay text
 if essay_text:
     st.subheader("Essay Text Preview")
-    st.text(essay_text[:500] + ("..." if len(essay_text) > 500 else ""))
+    st.text_area("Preview:", value=essay_text, height=300)
 
-# Show the button **after** the essay text area or PDF upload
+# Show the button after the essay text area or PDF upload
 if essay_text and st.button("Analyze Essay"):
     with st.spinner("Analyzing essay..."):
         analysis_results = analyze_essay(essay_text)  # Your existing function
@@ -95,3 +110,34 @@ if essay_text and st.button("Analyze Essay"):
         st.text(analysis_results)
         # Save to session for Q&A
         st.session_state['essay_text'] = essay_text
+
+# Follow-up Q&A
+if 'essay_text' in st.session_state:
+    st.subheader("Ask Questions About the Essay")
+
+    # Text input for the question
+    user_question = st.text_input("Enter your question:")
+
+    # Button to submit the question
+    if user_question and st.button("Get Answer"):
+        with st.spinner("Generating answer..."):
+            answer = answer_question(st.session_state['essay_text'], user_question)
+            st.text_area("Answer:", value=answer, height=150)
+
+# Delete Essay
+if 'essay_text' in st.session_state:
+    if st.button("Delete Essay"):
+        del st.session_state['essay_text']
+        st.success("Essay deleted. You can now upload a new one or paste text.")
+        
+        # Optionally clear the question input
+        if 'user_question' in st.session_state:
+            del st.session_state['user_question']
+        
+        # Instead of st.experimental_rerun(), we can do this:
+        st.session_state['reset_ui'] = True  # flag to trigger UI reset
+
+# Option for the user to exit
+if st.button("Exit"):
+    st.warning("Program ended by user.")
+    st.stop()
